@@ -1,0 +1,6 @@
+{
+  "title": "chore: bootstrap Opportunity Radar AI SaaS foundation",
+  "body": "This PR establishes the production-ready foundation for the ORA (Opportunity Radar AI) platform.\n\nIncludes:\n- Next.js 15\n- TypeScript\n- Tailwind CSS\n- ESLint\n- Prettier\n- GitHub Actions CI\n- CodeQL\n- Dependabot\n- Husky\n- lint-staged\n- Enterprise folder structure\n- .env.example\n- MIT License\n- Initial documentation\n\nThis PR must not be merged until reviewed.",
+  "head": "foundation/initial",
+  "base": "Jules"
+}
