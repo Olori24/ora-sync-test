@@ -1,6 +1,8 @@
 name: PR CI Notifier
 
 on:
+  workflow_run:
+    types: [completed]
   check_suite:
     types: [completed]
 
@@ -22,9 +24,9 @@ jobs:
             const repo = context.repo.repo;
 
             // Determine commit SHA and a URL for details
-            const commit_sha = (context.payload.check_suite && context.payload.check_suite.head_sha) || context.payload.after || context.sha;
-            const details_url = (context.payload.check_suite && context.payload.check_suite.html_url) || null;
-            const conclusion = (context.payload.check_suite && context.payload.check_suite.conclusion) || 'completed';
+            const commit_sha = (context.payload.workflow_run && context.payload.workflow_run.head_sha) || (context.payload.check_suite && context.payload.check_suite.head_sha) || context.payload.after || context.sha;
+            const details_url = (context.payload.workflow_run && context.payload.workflow_run.html_url) || (context.payload.check_suite && context.payload.check_suite.html_url) || null;
+            const conclusion = (context.payload.workflow_run && context.payload.workflow_run.conclusion) || (context.payload.check_suite && context.payload.check_suite.conclusion) || 'completed';
 
             if (!commit_sha) {
               console.log('No commit SHA found in payload; exiting.');
