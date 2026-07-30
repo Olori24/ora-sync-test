@@ -1,0 +1,63 @@
+name: PR CI Notifier
+
+on:
+  workflow_run:
+    types: [completed]
+  check_suite:
+    types: [completed]
+
+permissions:
+  contents: read
+  checks: read
+  issues: write
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send PR notification comment
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Determine commit SHA and a URL for details
+            const commit_sha = (context.payload.workflow_run && context.payload.workflow_run.head_sha) || (context.payload.check_suite && context.payload.check_suite.head_sha) || context.payload.after || context.sha;
+            const details_url = (context.payload.workflow_run && context.payload.workflow_run.html_url) || (context.payload.check_suite && context.payload.check_suite.html_url) || null;
+            const conclusion = (context.payload.workflow_run && context.payload.workflow_run.conclusion) || (context.payload.check_suite && context.payload.check_suite.conclusion) || 'completed';
+
+            if (!commit_sha) {
+              core.info('No commit SHA found in payload; exiting.');
+              return;
+            }
+
+            // Find PRs associated with the commit
+            const { data: associatedPRs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({ owner, repo, commit_sha });
+
+            if (!associatedPRs || associatedPRs.length === 0) {
+              core.info(`No pull requests associated with commit ${commit_sha}`);
+              return;
+            }
+
+            // Gather check runs summary for the commit
+            let checks = [];
+            try {
+              const checkResults = await github.rest.checks.listForRef({ owner, repo, ref: commit_sha });
+              checks = checkResults.data.check_runs || [];
+            } catch (e) {
+              core.info('Unable to list check runs: ' + e.message);
+            }
+
+            const success = conclusion === 'success';
+            const header = success ? '✅ CI completed: all checks passed' : '❌ CI completed: some checks failed or are neutral';
+            const detailsLink = details_url ? `\n\n[View workflow run details](${details_url})` : '';
+
+            const checkLines = checks.map(c => `- **${c.name}** — ${c.status}/${c.conclusion || 'n/a'}${c.html_url ? ` ([details](${c.html_url}))` : ''}`).join('\n') || '- No check run details available.';
+
+            const commentBody = `### ${header}\n\nCommit: \\`${commit_sha}\\`${detailsLink}\n\n**Check runs:**\n${checkLines}\n\nIf checks failed, I will attempt to diagnose and push fixes to the branch. Otherwise, no action required.\n\n*This comment posted by the PR CI Notifier workflow.*`;
+
+            for (const pr of associatedPRs) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body: commentBody });
+            }
